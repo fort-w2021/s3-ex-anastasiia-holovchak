@@ -1,0 +1,121 @@
+## Lektüre & Quiz: `S3` 
+
+Lesen Sie das [`S3`](https://adv-r.hadley.nz/s3.html) Kapitel von H. Wickham's *Advanced R*. 
+Bearbeiten Sie (mindestens) die folgenden von dort übernommenen/inspirierten Aufgaben:
+
+
+- Was tut die `as.data.frame.data.frame()` Methode? Warum ist das verwirrend? Wie können Sie derartige Verwirrung in Ihrem eigenen Code vermeiden?
+
+`as.data.frame.data.frame()` ist eine Methode für die *generic* Funktion `as.data.frame()`
+und Klasse `data.frame`, somit wird also definiert, wie sich die o.g. generische Funtion
+für die Klasse `data.frame` verhält.
+
+Das ist verwirrend, da sowie der Name von generic als auch der Name der Klasse `.` 
+enthalten; somit kann man schlecht verstehen, wie eigentlich der Name der generischen
+Funktion ist etc. Für die beiden Namen sollte man `snake_case` nutzen.
+
+
+- Beschreiben/erklären Sie das Verhalten dieses Codes:
+```r
+set.seed(1014)
+some_days <- as.Date("2019-11-24") + sample(10, 5)
+mean(some_days)
+# [1] "2019-11-30"
+mean(unclass(some_days))
+# [1] 18230.4
+```
+
+Im ersten Fall wird die generische Funktion `mean()` auf ein Element der Klasse
+`Date` angewendet, im zweiten Fall - auf ein Element der Klasse `numeric`.
+Daher tut unsere *generic* unterschiedliche Dinge.
+
+- Welche Klasse hat `x` im folgenden Code? Auf welchem *base type* basiert diese Klasse? Welche Attribute nutzt sie und wie sind die mathematischen Eigenschaften von Verteilungsfunktionen hier konkret implementiert? 
+```r
+x <- ecdf(rpois(100, 10))
+x
+# Empirical CDF 
+# Call: ecdf(rpois(100, 10))
+#  x[1:15] =      1,      4,      5,  ...,     16,     17
+```
+
+Mittels folgender Befehle werden die Fragen beantwortet:
+```{r}
+x <- ecdf(rpois(100, 10))
+class(x)
+typeof(x)
+attributes(x)
+ecdf
+```
+
+Klasse von `x`: ein Vektor mit drei Elementen `ecdf`, `stepfun`, `function`. Dabei
+ist `ecdf` die "engste" Klasse, `function` - die breiteste.
+Die Klasse basiert auf dem base type `closure` (Funktion + Environment).
+Attribute von `x`: `class` (wie oben beschrieben) und `call` (Funktionsaufruf) 
+Implementation der mathematischen Eigenschaften von cdf:
+* `cumsum(tabulate(match(x, vals)))/n` - Funktion zw. 0 und 1, mon. steigend
+* yleft = 0 - Limes für x gegen Minus Unendl.
+* yright = 1 - Limes für x gegen Plus Unendl.
+
+
+- Schreiben Sie einen neuen low-level Konstruktor für `data.frame`-Objekte (ohne die Funktionen `as.data.frame()` oder `data.frame()` zu benutzen, selbstverständlich). Machen Sie sich zunächst klar: Auf welchem *base type* basiert `data.frame`? Welche Attribute nutzt `data.frame`? Welche Restriktionen gelten für die verschiedenen Einträge und Attribute?  
+    *Hinweis*: Sehen Sie sich dafür zunächst mal so etwas wie `str(unclass(<irgend ein data.frame>))` an.
+
+  * Base type: Liste
+  * Attribute: `names`(column names), `class` (`data.frame`), `row.names`
+  * Restriktionen: `names` sowie `row.names` sollen vom Typ `character` sein, 
+alle Spalten sollen von gleicher Länge sein, Länge von `row.names` soll der Anzahl 
+vn Zeilen des `data.frame` entsprechen.
+
+  * Funktion in der Datei `s3-hadley-data-frame-sol.R`
+
+  
+- Kategorisieren Sie die Klassen der Rückgabe-Objekte von `lm(), factor(), table(), as.Date(), as.POSIXct(), ecdf(), ordered(), I()` in die Klassentypen *vector class*, *record style class*, *scalar class* die in *Advanced R* beschrieben  werden.
+
+  * *vector class*: `factor(), table(), as.Date(), as.POSIXct(), ordered()`
+  * *record style class*: keine
+  * *scalar class*: `lm(), ecdf()`
+
+Ich war überrascht wegen `as.POSIXct()`, habe mir aber bis heute keine Gedanken darüber gemacht.
+Woran liegt eigentlich der Unterschied und warum ist es sinnvoll?
+
+
+- Wie sähe ein Konstruktor `new_lm` für Objekte der Klasse `lm` aus? Warum wäre ein solcher Konstruktor vermutlich nicht besonders nützlich? 
+
+Untersuche erstmal ein `lm`-Objekt:
+```{r}
+lm1 <- lm(Petal.Length ~ Sepal.Length, data = iris)
+class(lm1)
+typeof(lm1)
+attributes(lm1)
+```
+Weiterhin ist nötig zu wissen welche Basistypen Attribute von einem `lm`-Objekt haben,
+damit im Konstruktor auf syntaktische Korrektheit überprüft werden kann.
+
+Ich habe leider nichts besseres gefunden als
+```{r}
+for (i in 1:length(attributes(lm1)$names)) { 
+  cat(attributes(lm1)$names[i], "is of type", typeof(lm1[[i]]), "\n") 
+  }
+```
+
+
+- Lesen Sie den Quellcode für `t()` und `t.test()`. Ist `t.test()` eine generische S3 Funktion oder eine S3 Methode? Was passiert **im Detail** wenn sie `t()` auf ein S3-Objekt mit Klasse `test` anwenden (s.u.)? Warum?
+```{r}
+x <- structure(1:10, class = "test")
+t(x)
+```
+
+Bei Ausführung von folgendem Code
+```{r}
+t.test
+```
+erkennen wir, dass `t.test` eine generische S3 Funktion ist (da `UseMethod()` benutzt wird).
+
+Falls ein Objekt `x` der Klasse `test` vorliegt, wird mit `t(x)` die Methode `t.default()`
+aufgerufen. Das erkennt man daran, dass es keine spezifische Methode der generischen
+Funktion `t()` für die Klasse `test`gibt:
+
+```{r}
+methods(t)
+```
+
